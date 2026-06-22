@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nonebot-plugin-proxy-probe"
-version = "0.2.3"
+version = "0.2.4"
 description = "扫描内网 Clash 代理并缓存出口 IP 与属地的 NoneBot2 插件"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,6 +20,11 @@ dependencies = [
   "urllib3>=1.26,<3",
   "Pillow>=10.0.0"
 ]
+
+[project.urls]
+Homepage = "https://github.com/WhyPilotXia/nonebot-plugin-proxy-probe"
+Repository = "https://github.com/WhyPilotXia/nonebot-plugin-proxy-probe"
+Issues = "https://github.com/WhyPilotXia/nonebot-plugin-proxy-probe/issues"
 
 [tool.nonebot]
 plugins = ["nonebot_plugin_proxy_probe"]

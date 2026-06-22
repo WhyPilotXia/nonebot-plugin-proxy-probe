@@ -19,6 +19,7 @@ __plugin_meta__ = PluginMetadata(
         "/proxy -s 或 --stop 停止后台任务"
     ),
     type="application",
+    homepage="https://github.com/WhyPilotXia/nonebot-plugin-proxy-probe",
     supported_adapters={"~onebot.v11"},
     config=PluginConfig,
 )
