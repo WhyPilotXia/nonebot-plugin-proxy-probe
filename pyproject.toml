@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nonebot-plugin-proxy-probe"
+version = "0.1.0"
+description = "扫描内网 Clash 代理并缓存出口 IP 与属地的 NoneBot2 插件"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GPL-3.0-or-later" }
+authors = [
+  { name = "lhc" }
+]
+dependencies = [
+  "nonebot2>=2.3.0",
+  "nonebot-adapter-onebot>=2.0.0",
+  "nonebot-plugin-localstore>=0.7.0",
+  "requests>=2.31,<3",
+  "urllib3>=1.26,<3",
+  "Pillow>=10.0.0"
+]
+
+[tool.nonebot]
+plugins = ["nonebot_plugin_proxy_probe"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nonebot_plugin_proxy_probe*"]
+
+[tool.setuptools.package-data]
+nonebot_plugin_proxy_probe = ["assets/*.ttf"]
