@@ -31,7 +31,9 @@ STOP = object()
 UpdateCallback = Callable[
     [PipelineProgress, list[ProxyRecord], int, int], None
 ]
-RefreshCallback = Callable[[list[ProxyRecord], int, int], None]
+RefreshCallback = Callable[
+    [list[ProxyRecord], "RefreshProgress"], None
+]
 
 
 class SourceAddressAdapter(HTTPAdapter):
@@ -114,9 +116,18 @@ class ProbeRunResult:
 @dataclass(frozen=True)
 class RefreshRunResult:
     results: list[ProxyRecord]
-    completed: int
-    total: int
+    progress: "RefreshProgress"
     interrupted: bool
+
+
+@dataclass(frozen=True)
+class RefreshProgress:
+    total: int = 0
+    completed: int = 0
+    proxy_tested: int = 0
+    proxy_count: int = 0
+    geo_tested: int = 0
+    geo_success: int = 0
 
 
 def source_address(config: ProbeConfig) -> tuple[str, int] | None:
@@ -812,8 +823,14 @@ def run_probe(
     geo_queue: queue.Queue[Any] = queue.Queue()
     state_lock = threading.RLock()
     results: dict[tuple[str, int], ProxyRecord] = {}
-    ip_states: dict[str, dict[str, Any]] = {}
-    counters = {"scan": 0, "proxy": 0, "geo": 0}
+    counters = {
+        "scan_completed": 0,
+        "open_count": 0,
+        "proxy_tested": 0,
+        "proxy_count": 0,
+        "geo_tested": 0,
+        "geo_success": 0,
+    }
     notify_counter = {"scan": 0}
 
     def snapshot(task_current: int | None = None) -> None:
@@ -822,9 +839,12 @@ def run_probe(
         with state_lock:
             progress = PipelineProgress(
                 total=total,
-                scan_completed=counters["scan"],
-                proxy_completed=counters["proxy"],
-                geo_completed=counters["geo"],
+                scan_completed=counters["scan_completed"],
+                open_count=counters["open_count"],
+                proxy_tested=counters["proxy_tested"],
+                proxy_count=counters["proxy_count"],
+                geo_tested=counters["geo_tested"],
+                geo_success=counters["geo_success"],
             )
             records = _sorted_records(results, port_order)
         callback(
@@ -835,25 +855,15 @@ def run_probe(
         )
 
     def complete_proxy_endpoint(
-        ip: str,
         verified: ProxyRecord | None,
     ) -> None:
-        queue_geo: ProxyRecord | None = None
         with state_lock:
-            state = ip_states[ip]
+            counters["proxy_tested"] += 1
             if verified is not None:
                 results[(verified.ip, verified.port)] = verified
-                state["geo_remaining"] += 1
-                queue_geo = verified
-            state["proxy_remaining"] -= 1
-            if state["proxy_remaining"] == 0:
-                counters["proxy"] += 1
-                state["proxy_counted"] = True
-                if state["geo_remaining"] == 0:
-                    counters["geo"] += 1
-                    state["geo_counted"] = True
-        if queue_geo is not None and not stop_event.is_set():
-            geo_queue.put(queue_geo)
+                counters["proxy_count"] += 1
+        if verified is not None and not stop_event.is_set():
+            geo_queue.put(verified)
         snapshot()
 
     def scan_worker() -> None:
@@ -876,20 +886,12 @@ def run_probe(
                     continue
 
                 with state_lock:
-                    counters["scan"] += 1
-                    ip_states[ip] = {
-                        "proxy_remaining": len(opened),
-                        "geo_remaining": 0,
-                        "proxy_counted": not opened,
-                        "geo_counted": not opened,
-                    }
-                    if not opened:
-                        counters["proxy"] += 1
-                        counters["geo"] += 1
+                    counters["scan_completed"] += 1
+                    counters["open_count"] += len(opened)
                     notify_counter["scan"] += 1
                     should_notify = (
                         notify_counter["scan"] >= 64
-                        or counters["scan"] == total
+                        or counters["scan_completed"] == total
                     )
                     if should_notify:
                         notify_counter["scan"] = 0
@@ -921,7 +923,7 @@ def run_probe(
                         public_ip=NOT_PROBED,
                         location=NOT_PROBED,
                     )
-                complete_proxy_endpoint(ip, record)
+                complete_proxy_endpoint(record)
             finally:
                 proxy_queue.task_done()
 
@@ -951,15 +953,9 @@ def run_probe(
                 )
                 with state_lock:
                     results[(proxy.ip, proxy.port)] = updated
-                    state = ip_states[proxy.ip]
-                    state["geo_remaining"] -= 1
-                    if (
-                        state["proxy_counted"]
-                        and state["geo_remaining"] == 0
-                        and not state["geo_counted"]
-                    ):
-                        counters["geo"] += 1
-                        state["geo_counted"] = True
+                    counters["geo_tested"] += 1
+                    if public_ip not in (UNAVAILABLE, NOT_PROBED):
+                        counters["geo_success"] += 1
                 snapshot()
             finally:
                 geo_queue.task_done()
@@ -1008,9 +1004,12 @@ def run_probe(
     with state_lock:
         final_progress = PipelineProgress(
             total=total,
-            scan_completed=counters["scan"],
-            proxy_completed=counters["proxy"],
-            geo_completed=counters["geo"],
+            scan_completed=counters["scan_completed"],
+            open_count=counters["open_count"],
+            proxy_tested=counters["proxy_tested"],
+            proxy_count=counters["proxy_count"],
+            geo_tested=counters["geo_tested"],
+            geo_success=counters["geo_success"],
         )
         final_results = _sorted_records(results, port_order)
     return ProbeRunResult(
@@ -1036,18 +1035,30 @@ def run_refresh(
     verify_queue: queue.Queue[Any] = queue.Queue()
     geo_queue: queue.Queue[Any] = queue.Queue()
     lock = threading.RLock()
-    completed = 0
+    counters = {
+        "completed": 0,
+        "proxy_tested": 0,
+        "proxy_count": 0,
+        "geo_tested": 0,
+        "geo_success": 0,
+    }
 
     def snapshot() -> None:
         if callback is None:
             return
         with lock:
             records = _sorted_records(results, port_order)
-            current = completed
-        callback(records, current, total)
+            progress = RefreshProgress(
+                total=total,
+                completed=counters["completed"],
+                proxy_tested=counters["proxy_tested"],
+                proxy_count=counters["proxy_count"],
+                geo_tested=counters["geo_tested"],
+                geo_success=counters["geo_success"],
+            )
+        callback(records, progress)
 
     def verify_worker() -> None:
-        nonlocal completed
         while True:
             item = verify_queue.get()
             try:
@@ -1068,7 +1079,8 @@ def run_refresh(
                 if not status:
                     with lock:
                         results.pop(key, None)
-                        completed += 1
+                        counters["proxy_tested"] += 1
+                        counters["completed"] += 1
                     snapshot()
                     continue
                 verified = ProxyRecord(
@@ -1080,13 +1092,14 @@ def run_refresh(
                 )
                 with lock:
                     results[key] = verified
+                    counters["proxy_tested"] += 1
+                    counters["proxy_count"] += 1
                 geo_queue.put(verified)
                 snapshot()
             finally:
                 verify_queue.task_done()
 
     def geo_worker() -> None:
-        nonlocal completed
         while True:
             item = geo_queue.get()
             try:
@@ -1112,7 +1125,10 @@ def run_refresh(
                 )
                 with lock:
                     results[(proxy.ip, proxy.port)] = updated
-                    completed += 1
+                    counters["geo_tested"] += 1
+                    if public_ip not in (UNAVAILABLE, NOT_PROBED):
+                        counters["geo_success"] += 1
+                    counters["completed"] += 1
                 snapshot()
             finally:
                 geo_queue.task_done()
@@ -1153,10 +1169,16 @@ def run_refresh(
     snapshot()
     with lock:
         final_results = _sorted_records(results, port_order)
-        final_completed = completed
+        final_progress = RefreshProgress(
+            total=total,
+            completed=counters["completed"],
+            proxy_tested=counters["proxy_tested"],
+            proxy_count=counters["proxy_count"],
+            geo_tested=counters["geo_tested"],
+            geo_success=counters["geo_success"],
+        )
     return RefreshRunResult(
         results=final_results,
-        completed=final_completed,
-        total=total,
+        progress=final_progress,
         interrupted=stop_event.is_set(),
     )

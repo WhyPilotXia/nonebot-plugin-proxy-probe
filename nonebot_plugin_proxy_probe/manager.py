@@ -20,6 +20,7 @@ from .models import CacheState, PipelineProgress, ProxyRecord
 from .probe import (
     ProbeConfig,
     ProbeRunResult,
+    RefreshProgress,
     RefreshRunResult,
     detect_direct_public_ip,
     detect_local_network,
@@ -163,13 +164,22 @@ class ProbeManager:
     def _refresh_callback(
         self,
         results: list[ProxyRecord],
-        current: int,
-        total: int,
+        refresh: RefreshProgress,
     ) -> None:
         with self._state_lock:
             self._state.results = list(results)
-            self._state.task_current = current
-            self._state.task_total = total
+            current = self._state.progress
+            self._state.progress = PipelineProgress(
+                total=current.total,
+                scan_completed=current.scan_completed,
+                open_count=current.open_count,
+                proxy_tested=refresh.proxy_tested,
+                proxy_count=refresh.proxy_count,
+                geo_tested=refresh.geo_tested,
+                geo_success=refresh.geo_success,
+            )
+            self._state.task_current = refresh.completed
+            self._state.task_total = refresh.total
         self._persist()
 
     async def start(
@@ -202,6 +212,12 @@ class ProbeManager:
                     self._state.results = []
                 else:
                     self._state.task_total = len(self._state.results)
+                    current = self._state.progress
+                    self._state.progress = PipelineProgress(
+                        total=current.total,
+                        scan_completed=current.scan_completed,
+                        open_count=current.open_count,
+                    )
             self._persist(force=True)
             self._task = asyncio.create_task(
                 self._run(operation),
@@ -278,7 +294,9 @@ class ProbeManager:
                     self._state.results = result.results
                     self._state.task_current = result.progress.scan_completed
                     self._state.task_total = result.progress.total
-                    self._state.scan_time = format_time()
+                    completed_at = format_time()
+                    self._state.scan_time = completed_at
+                    self._state.refresh_time = completed_at
             else:
                 cached = self.get_state().results
                 refresh_result: RefreshRunResult = await asyncio.to_thread(
@@ -291,8 +309,19 @@ class ProbeManager:
                 stopped = refresh_result.interrupted
                 with self._state_lock:
                     self._state.results = refresh_result.results
-                    self._state.task_current = refresh_result.completed
-                    self._state.task_total = refresh_result.total
+                    refresh = refresh_result.progress
+                    current = self._state.progress
+                    self._state.progress = PipelineProgress(
+                        total=current.total,
+                        scan_completed=current.scan_completed,
+                        open_count=current.open_count,
+                        proxy_tested=refresh.proxy_tested,
+                        proxy_count=refresh.proxy_count,
+                        geo_tested=refresh.geo_tested,
+                        geo_success=refresh.geo_success,
+                    )
+                    self._state.task_current = refresh.completed
+                    self._state.task_total = refresh.total
                     self._state.refresh_time = format_time()
         except Exception as exc:
             error = exc

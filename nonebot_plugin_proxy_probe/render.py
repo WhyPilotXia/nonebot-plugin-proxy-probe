@@ -107,22 +107,21 @@ def render_cache_image(state: CacheState) -> bytes:
     )
 
     progress = state.progress
-    total = progress.total
     draw.text(
         (MARGIN, 236),
-        f"端口扫描：{progress.scan_completed}/{total}",
+        f"端口扫描：{progress.open_count} open in {progress.scan_completed}",
         font=info_font,
         fill="#344054",
     )
     draw.text(
         (MARGIN + 540, 236),
-        f"代理验证：{progress.proxy_completed}/{total}",
+        f"代理验证：{progress.proxy_count} proxy in {progress.proxy_tested}",
         font=info_font,
         fill="#344054",
     )
     draw.text(
         (MARGIN + 1080, 236),
-        f"属地探测：{progress.geo_completed}/{total}",
+        f"属地探测：{progress.geo_success} tested in {progress.geo_tested}",
         font=info_font,
         fill="#344054",
     )

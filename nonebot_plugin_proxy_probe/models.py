@@ -34,8 +34,11 @@ class ProxyRecord:
 class PipelineProgress:
     total: int = 0
     scan_completed: int = 0
-    proxy_completed: int = 0
-    geo_completed: int = 0
+    open_count: int = 0
+    proxy_tested: int = 0
+    proxy_count: int = 0
+    geo_tested: int = 0
+    geo_success: int = 0
 
     def to_dict(self) -> dict[str, int]:
         return asdict(self)
@@ -45,8 +48,11 @@ class PipelineProgress:
         return cls(
             total=max(0, int(data.get("total", 0))),
             scan_completed=max(0, int(data.get("scan_completed", 0))),
-            proxy_completed=max(0, int(data.get("proxy_completed", 0))),
-            geo_completed=max(0, int(data.get("geo_completed", 0))),
+            open_count=max(0, int(data.get("open_count", 0))),
+            proxy_tested=max(0, int(data.get("proxy_tested", 0))),
+            proxy_count=max(0, int(data.get("proxy_count", 0))),
+            geo_tested=max(0, int(data.get("geo_tested", 0))),
+            geo_success=max(0, int(data.get("geo_success", 0))),
         )
 
 
@@ -66,7 +72,7 @@ class CacheState:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "version": 1,
+            "version": 2,
             "scan_time": self.scan_time,
             "refresh_time": self.refresh_time,
             "local_ip": self.local_ip,
@@ -97,6 +103,33 @@ class CacheState:
         progress_data = data.get("progress")
         if not isinstance(progress_data, dict):
             progress_data = {}
+        progress = PipelineProgress.from_dict(progress_data)
+        # 旧缓存只有三个“完成 IP 数”，无法还原开放端口总数。用结果列表
+        # 推导保守值；下一次完整扫描后会写入精确漏斗统计。
+        if (
+            "open_count" not in progress_data
+            and any(
+                key in progress_data
+                for key in ("proxy_completed", "geo_completed")
+            )
+        ):
+            geo_tested = sum(
+                item.public_ip != NOT_PROBED for item in results
+            )
+            geo_success = sum(
+                item.public_ip not in (NOT_PROBED, UNAVAILABLE)
+                for item in results
+            )
+            progress = PipelineProgress(
+                total=progress.total,
+                scan_completed=progress.scan_completed,
+                open_count=len(results),
+                proxy_tested=len(results),
+                proxy_count=len(results),
+                geo_tested=geo_tested,
+                geo_success=geo_success,
+            )
+
         return cls(
             scan_time=str(data.get("scan_time", "未扫描")),
             refresh_time=str(data.get("refresh_time", "未刷新")),
@@ -107,6 +140,6 @@ class CacheState:
             task_status=str(data.get("task_status", "空闲")),
             task_current=max(0, int(data.get("task_current", 0))),
             task_total=max(0, int(data.get("task_total", 0))),
-            progress=PipelineProgress.from_dict(progress_data),
+            progress=progress,
             results=results,
         )
