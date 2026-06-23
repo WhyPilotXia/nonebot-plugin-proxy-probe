@@ -6,6 +6,7 @@ import os
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 
 from nonebot.adapters.onebot.v11 import (
     Bot,
@@ -17,6 +18,7 @@ from nonebot.log import logger
 
 from .cache import load_cache, load_target_ip, save_cache, save_target_ip
 from .config import PluginConfig, plugin_config
+from .exporter import export_clash_yaml
 from .models import CacheState, PipelineProgress, ProxyRecord
 from .probe import (
     ProbeConfig,
@@ -166,10 +168,13 @@ class ProbeManager:
             os.environ[key] = proxy_url
         return (
             True,
-            f"已将当前进程代理设置为第 {index} 个：{proxy_url}\n"
-            "这会影响当前 Bot 进程中后续读取环境变量的网络请求；"
-            "已创建且不读取环境变量的客户端可能不会立即生效。",
+            f"已将当前进程环境变量代理设置为第 {index} 个：{proxy_url}\n"
         )
+
+    def export_proxy_list(self) -> tuple[Path, int, int]:
+        with self._state_lock:
+            results = list(self._state.results)
+        return export_clash_yaml(results)
 
     def _persist(self, force: bool = False) -> None:
         with self._persist_lock:

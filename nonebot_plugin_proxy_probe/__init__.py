@@ -17,7 +17,8 @@ __plugin_meta__ = PluginMetadata(
         "/proxy -p 或 --probe 重新扫描\n"
         "/proxy -r 或 --refresh 刷新缓存\n"
         "/proxy -c 或 --cancel 停止后台任务\n"
-        "/proxy -s <编号> 或 --set <编号> 设置当前进程代理"
+        "/proxy -s <编号> 或 --set <编号> 设置当前进程代理\n"
+        "/proxy -e 或 --export 导出 Clash YAML 并发送群文件"
     ),
     type="application",
     homepage="https://github.com/WhyPilotXia/nonebot-plugin-proxy-probe",

@@ -134,6 +134,7 @@ LocalStore 用户设置 > proxy_probe_target_ip 环境变量 > 自动探测
 | `/proxy -r`、`/proxy --refresh` | 所有用户 | 刷新缓存代理的可用性、出口 IP 和属地，任务开始时添加表情 `294`。 |
 | `/proxy -c`、`/proxy --cancel` | 所有用户 | 停止当前后台任务，保存并输出已有结果。 |
 | `/proxy -s <编号>`、`/proxy --set <编号>` | 超级用户 | 将结果图片中对应编号的代理设置为当前 Bot 进程代理。也支持 `--set=<编号>`。 |
+| `/proxy -e`、`/proxy --export` | 所有用户 | 将全部缓存代理导出为 Clash YAML，并作为群文件发送。 |
 
 同一时间只允许一个重新扫描或缓存刷新任务运行。任务运行期间仍可使用
 `/proxy` 查看当前缓存和实时进度。
@@ -203,6 +204,7 @@ require("nonebot_plugin_localstore")
 
 - `proxy_cache.json`：扫描结果、扫描/刷新时间、流水线进度和任务状态。
 - `settings.json`：通过 `/proxy -i` 或 `/proxy --ip` 保存的目标参考 IP。
+- `xx个-xx月xx日xx时xx分.yaml`：通过 `/proxy -e` 导出的 Clash 配置。节点以探测属地命名；“自动选择”优先在新加坡节点中测速并选择最低延迟，没有新加坡节点时回退为全部节点。
 
 JSON 使用临时文件替换方式原子写入，降低异常退出导致缓存损坏的概率。
 Bot 重启后不会尝试恢复旧线程，未完成任务会标记为因重启中止。

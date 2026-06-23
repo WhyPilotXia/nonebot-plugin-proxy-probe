@@ -23,7 +23,8 @@ USAGE = (
     "/proxy -p 或 --probe 重新扫描\n"
     "/proxy -r 或 --refresh 刷新缓存\n"
     "/proxy -c 或 --cancel 停止后台任务\n"
-    "/proxy -s <编号> 或 --set <编号> 设置当前进程代理"
+    "/proxy -s <编号> 或 --set <编号> 设置当前进程代理\n"
+    "/proxy -e 或 --export 导出 Clash YAML 并发送群文件"
 )
 
 
@@ -39,6 +40,8 @@ def parse_command(argument: str) -> tuple[str, str] | None:
         "--refresh": ("refresh", ""),
         "-c": ("stop", ""),
         "--cancel": ("stop", ""),
+        "-e": ("export", ""),
+        "--export": ("export", ""),
     }
     exact = actions.get(normalized)
     if exact is not None:
@@ -131,6 +134,31 @@ async def handle_proxy(
             await proxy_command.finish(f"代理编号必须是正整数：{value}")
         saved, message = manager.set_process_proxy(proxy_index)
         await proxy_command.finish(message)
+
+    if action == "export":
+        if not isinstance(event, GroupMessageEvent):
+            await proxy_command.finish("导出代理列表仅支持在群聊中使用。")
+        try:
+            path, proxy_count, singapore_count = manager.export_proxy_list()
+            await bot.upload_group_file(
+                group_id=event.group_id,
+                file=str(path.resolve()),
+                name=path.name,
+            )
+        except (OSError, ValueError) as exc:
+            await proxy_command.finish(f"导出代理列表失败：{exc}")
+        except Exception as exc:
+            logger.exception("发送代理列表群文件失败")
+            await proxy_command.finish(f"发送代理列表群文件失败：{exc}")
+        if singapore_count:
+            await proxy_command.finish(
+                f"已导出 {proxy_count} 个代理；自动选择包含 "
+                f"{singapore_count} 个新加坡节点，并由 Clash 选择最低延迟。"
+            )
+        await proxy_command.finish(
+            f"已导出 {proxy_count} 个代理；未找到新加坡节点，"
+            "自动选择已回退为全部节点。"
+        )
 
     if action == "probe":
         await set_emoji(bot, event, "427")
