@@ -250,10 +250,11 @@ nonebot_plugin_proxy_probe/
 ├── cache.py           # LocalStore 结果缓存和用户设置持久化
 ├── commands.py        # /proxy 命令解析与 OneBot 事件处理
 ├── config.py          # NoneBot/Pydantic 配置模型
-├── manager.py         # 后台任务互斥、停止、状态更新与结果发送
+├── exporter.py        # 生成 Clash YAML 并缓存到 LocalStore
+├── manager.py         # 后台任务、进程代理设置与 YAML 导出调度
 ├── models.py          # 代理结果、流水线进度和缓存模型
 ├── probe.py           # 网卡识别、端口扫描、代理验证和属地探测
-├── render.py          # Pillow 表格绘制与 Base64 图片转换
+├── render.py          # 结果排序、Pillow 表格绘制与图片转换
 └── assets/
     └── 原神字体.ttf   # 图片渲染字体
 ```
