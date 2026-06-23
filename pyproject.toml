@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nonebot-plugin-proxy-probe"
-version = "0.2.4"
+version = "0.2.5"
 description = "扫描内网 Clash 代理并缓存出口 IP 与属地的 NoneBot2 插件"
 readme = "README.md"
 requires-python = ">=3.10"
