@@ -132,7 +132,7 @@ LocalStore 用户设置 > proxy_probe_target_ip 环境变量 > 自动探测
 | `/proxy -i <IPv4>`、`/proxy --ip <IPv4>` | 所有用户 | 将目标参考 IPv4 持久化到 LocalStore。也支持 `--ip=<IPv4>`。 |
 | `/proxy -p`、`/proxy --probe` | 所有用户 | 在后台重新扫描目标网段，任务开始时添加表情 `427`。 |
 | `/proxy -r`、`/proxy --refresh` | 所有用户 | 刷新缓存代理的可用性、出口 IP 和属地，任务开始时添加表情 `294`。 |
-| `/proxy -c`、`/proxy --cancel`、`/proxy --stop` | 所有用户 | 停止当前后台任务，保存并输出已有结果。 |
+| `/proxy -c`、`/proxy --cancel` | 所有用户 | 停止当前后台任务，保存并输出已有结果。 |
 | `/proxy -s <编号>`、`/proxy --set <编号>` | 超级用户 | 将结果图片中对应编号的代理设置为当前 Bot 进程代理。也支持 `--set=<编号>`。 |
 
 同一时间只允许一个重新扫描或缓存刷新任务运行。任务运行期间仍可使用
